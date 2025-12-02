@@ -44,6 +44,14 @@ private:
     uint32_t infrared_width;
     uint32_t infrared_height;
 
+    // IMU Buffer
+    rs2::frame gyro_frame;
+    rs2::frame accel_frame;
+    rs2_vector gyro_data;
+    rs2_vector accel_data;
+    double gyro_timestamp;
+    double accel_timestamp;
+
     filesystem::path bag_file;
     filesystem::path directory;
     std::vector<int32_t> params;
@@ -91,6 +99,12 @@ private:
     // Update Infrared
     inline void updateInfrared();
 
+    // Update Gyro
+    inline void updateGyro();
+
+    // Update Accel
+    inline void updateAccel();
+
     // Draw Data
     void draw();
 
@@ -126,6 +140,12 @@ private:
 
     // Save Infrared
     inline void saveInfrared();
+
+    // Save Gyro
+    inline void saveGyro();
+
+    // Save Accel
+    inline void saveAccel();
 };
 
 #endif // __REALSENSE__

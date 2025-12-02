@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 #include <limits>
+#include <fstream>
 
 // Constructor
 RealSense::RealSense( int argc, char* argv[] )
@@ -202,6 +203,12 @@ void RealSense::update()
 
     // Update Infrared
     updateInfrared();
+
+    // Update Gyro
+    updateGyro();
+
+    // Update Accel
+    updateAccel();
 }
 
 // Update Frame
@@ -263,6 +270,54 @@ inline void RealSense::updateInfrared()
     // Retrive Frame Size
     infrared_width = infrared_frame.as<rs2::video_frame>().get_width();
     infrared_height = infrared_frame.as<rs2::video_frame>().get_height();
+}
+
+// Update Gyro
+inline void RealSense::updateGyro()
+{
+    // Retrieve Gyro Frame
+    #if 29 < RS2_API_MINOR_VERSION
+    frameset.foreach_rs( [this]( const rs2::frame& frame ){
+    #else
+    frameset.foreach( [this]( const rs2::frame& frame ){
+    #endif
+        if( frame.get_profile().stream_type() == rs2_stream::RS2_STREAM_GYRO ){
+            gyro_frame = frame;
+        }
+    } );
+
+    if( !gyro_frame ){
+        return;
+    }
+
+    // Get Motion Data
+    rs2::motion_frame motion = gyro_frame.as<rs2::motion_frame>();
+    gyro_data = motion.get_motion_data();
+    gyro_timestamp = gyro_frame.get_timestamp();
+}
+
+// Update Accel
+inline void RealSense::updateAccel()
+{
+    // Retrieve Accel Frame
+    #if 29 < RS2_API_MINOR_VERSION
+    frameset.foreach_rs( [this]( const rs2::frame& frame ){
+    #else
+    frameset.foreach( [this]( const rs2::frame& frame ){
+    #endif
+        if( frame.get_profile().stream_type() == rs2_stream::RS2_STREAM_ACCEL ){
+            accel_frame = frame;
+        }
+    } );
+
+    if( !accel_frame ){
+        return;
+    }
+
+    // Get Motion Data
+    rs2::motion_frame motion = accel_frame.as<rs2::motion_frame>();
+    accel_data = motion.get_motion_data();
+    accel_timestamp = accel_frame.get_timestamp();
 }
 
 // Draw Data
@@ -482,6 +537,12 @@ void RealSense::save()
 
     // Save Infrared
     saveInfrared();
+
+    // Save Gyro
+    saveGyro();
+
+    // Save Accel
+    saveAccel();
 }
 
 // Save Color
@@ -502,6 +563,25 @@ inline void RealSense::saveColor()
 
     // Write Color Image
     cv::imwrite( oss.str(), color_mat, params );
+
+    // Save Metadata
+    std::ostringstream meta_oss;
+    meta_oss << directory.generic_string() << "/Color/metadata.csv";
+    filesystem::path meta_path = meta_oss.str();
+    bool write_header = !filesystem::exists( meta_path );
+    std::ofstream meta_file( meta_oss.str(), std::ios::app );
+    if( meta_file.is_open() ){
+        if( write_header ){
+            meta_file << "frame_number,timestamp,width,height,format" << std::endl;
+        }
+        meta_file << std::fixed << std::setprecision( 6 );
+        meta_file << color_frame.get_frame_number() << ",";
+        meta_file << color_frame.get_timestamp() << ",";
+        meta_file << color_width << ",";
+        meta_file << color_height << ",";
+        meta_file << color_frame.get_profile().format() << std::endl;
+        meta_file.close();
+    }
 }
 
 // Save Depth
@@ -528,6 +608,25 @@ inline void RealSense::saveDepth()
 
     // Write Depth Image
     cv::imwrite( oss.str(), scale_mat );
+
+    // Save Metadata
+    std::ostringstream meta_oss;
+    meta_oss << directory.generic_string() << "/Depth/metadata.csv";
+    filesystem::path meta_path = meta_oss.str();
+    bool write_header = !filesystem::exists( meta_path );
+    std::ofstream meta_file( meta_oss.str(), std::ios::app );
+    if( meta_file.is_open() ){
+        if( write_header ){
+            meta_file << "frame_number,timestamp,width,height,format" << std::endl;
+        }
+        meta_file << std::fixed << std::setprecision( 6 );
+        meta_file << depth_frame.get_frame_number() << ",";
+        meta_file << depth_frame.get_timestamp() << ",";
+        meta_file << depth_width << ",";
+        meta_file << depth_height << ",";
+        meta_file << depth_frame.get_profile().format() << std::endl;
+        meta_file.close();
+    }
 }
 
 // Save Infrared
@@ -546,15 +645,130 @@ inline void RealSense::saveInfrared()
 
         // Create Save Directory and File Name
         std::ostringstream oss;
-        if( infrared_stream_index != 0 ){
-            oss << directory.generic_string() << "/Infrared " << std::to_string( infrared_stream_index ) << "/";
+        // Use cleaner directory names: IR for left (index 1), IR_Right for right (index 2)
+        if( infrared_stream_index == 2 ){
+            oss << directory.generic_string() << "/IR_Right/";
         }
         else{
-            oss << directory.generic_string() << "/Infrared" << "/";
+            oss << directory.generic_string() << "/IR/";
         }
         oss << std::setfill( '0' ) << std::setw( 6 ) << infrared_frame.get_frame_number() << ".jpg";
 
         // Write Infrared Image
         cv::imwrite( oss.str(), infrared_mats[infrared_mat_index], params );
+
+        // Save Metadata
+        std::ostringstream meta_oss;
+        if( infrared_stream_index == 2 ){
+            meta_oss << directory.generic_string() << "/IR_Right/metadata.csv";
+        }
+        else{
+            meta_oss << directory.generic_string() << "/IR/metadata.csv";
+        }
+        filesystem::path meta_path = meta_oss.str();
+        bool write_header = !filesystem::exists( meta_path );
+        std::ofstream meta_file( meta_oss.str(), std::ios::app );
+        if( meta_file.is_open() ){
+            if( write_header ){
+                meta_file << "frame_number,timestamp,width,height,format" << std::endl;
+            }
+            meta_file << std::fixed << std::setprecision( 6 );
+            meta_file << infrared_frame.get_frame_number() << ",";
+            meta_file << infrared_frame.get_timestamp() << ",";
+            meta_file << infrared_width << ",";
+            meta_file << infrared_height << ",";
+            meta_file << infrared_frame.get_profile().format() << std::endl;
+            meta_file.close();
+        }
     }
+}
+
+// Save Gyro
+inline void RealSense::saveGyro()
+{
+    if( !gyro_frame ){
+        return;
+    }
+
+    // Create IMU Directory if it doesn't exist
+    filesystem::path imu_dir = directory.generic_string() + "/IMU";
+    if( !filesystem::exists( imu_dir ) ){
+        filesystem::create_directories( imu_dir );
+    }
+
+    // Create Save Directory and File Name
+    std::ostringstream oss;
+    oss << directory.generic_string() << "/IMU/gyro_data.csv";
+
+    // Open File (append mode)
+    std::ofstream file;
+    filesystem::path file_path = oss.str();
+
+    // Check if file exists to write header
+    bool write_header = !filesystem::exists( file_path );
+    file.open( oss.str(), std::ios::app );
+
+    if( !file.is_open() ){
+        return;
+    }
+
+    // Write Header
+    if( write_header ){
+        file << "frame_number,timestamp,x,y,z" << std::endl;
+    }
+
+    // Write Gyro Data
+    file << std::fixed << std::setprecision( 6 );
+    file << gyro_frame.get_frame_number() << ",";
+    file << gyro_timestamp << ",";
+    file << gyro_data.x << ",";
+    file << gyro_data.y << ",";
+    file << gyro_data.z << std::endl;
+
+    file.close();
+}
+
+// Save Accel
+inline void RealSense::saveAccel()
+{
+    if( !accel_frame ){
+        return;
+    }
+
+    // Create IMU Directory if it doesn't exist
+    filesystem::path imu_dir = directory.generic_string() + "/IMU";
+    if( !filesystem::exists( imu_dir ) ){
+        filesystem::create_directories( imu_dir );
+    }
+
+    // Create Save Directory and File Name
+    std::ostringstream oss;
+    oss << directory.generic_string() << "/IMU/accel_data.csv";
+
+    // Open File (append mode)
+    std::ofstream file;
+    filesystem::path file_path = oss.str();
+
+    // Check if file exists to write header
+    bool write_header = !filesystem::exists( file_path );
+    file.open( oss.str(), std::ios::app );
+
+    if( !file.is_open() ){
+        return;
+    }
+
+    // Write Header
+    if( write_header ){
+        file << "frame_number,timestamp,x,y,z" << std::endl;
+    }
+
+    // Write Accel Data
+    file << std::fixed << std::setprecision( 6 );
+    file << accel_frame.get_frame_number() << ",";
+    file << accel_timestamp << ",";
+    file << accel_data.x << ",";
+    file << accel_data.y << ",";
+    file << accel_data.z << std::endl;
+
+    file.close();
 }
