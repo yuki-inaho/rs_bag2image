@@ -1,8 +1,15 @@
 rs_bag2image
 ============
 
-This is convert tool that works on cross-platform (Windows, Linux, MacOS) for RealSense.  
-This tool converts all data of each stream types (Color, Depth, Infrared) that contained in bag file to image file.  
+This is convert tool that works on cross-platform (Windows, Linux, MacOS) for RealSense.
+This tool converts all data of each stream types (Color, Depth, Infrared, IMU) that contained in bag file to image file and CSV data.
+
+Features
+--------
+* Extract Color, Depth, and Infrared (Left/Right) streams as images
+* Extract IMU data (Gyroscope and Accelerometer) as CSV files
+* Save metadata (timestamp, frame number, resolution, format) for all image streams
+* Support for latest librealsense2 API
 
 Sample
 ------
@@ -18,14 +25,26 @@ file
   |-Color
   |   |-000001.jpg
   |   |-000002.jpg
+  |   |-metadata.csv
   |
   |-Depth
   |   |-000001.png
   |   |-000002.png
+  |   |-metadata.csv
   |
-  |-Infrared 1
+  |-IR
   |   |-000001.jpg
   |   |-000002.jpg
+  |   |-metadata.csv
+  |
+  |-IR_Right
+  |   |-000001.jpg
+  |   |-000002.jpg
+  |   |-metadata.csv
+  |
+  |-IMU
+      |-gyro_data.csv
+      |-accel_data.csv
 ```
 
 Option
@@ -39,10 +58,35 @@ Option
 
 Environment
 -----------
-* Visual Studio 2015/2017 / GCC 5.3 / Clang (require <code>\<filesystem\></code> supported) 
+### C++ Tool (rs_bag2image)
+* Visual Studio 2015/2017 / GCC 5.3 / Clang (require <code>\<filesystem\></code> supported)
 * RealSense SDK 2.x (librealsense v2.x)
 * OpenCV 3.4.0 (or later)
 * CMake 3.7.2 (latest release is preferred)
+
+### Python Script (images2mp4)
+* Python 3.8 or later
+* uv (recommended package manager)
+
+Installation
+------------
+### Using uv (recommended)
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install dependencies
+uv sync
+
+# Run the script
+uv run images2mp4 -i ./Color -o output.mp4 -f 30
+```
+
+### Using pip
+```bash
+pip install -r requirements.txt
+python images2mp4.py -i ./Color -o output.mp4 -f 30
+```
 
 License
 -------
