@@ -58,6 +58,10 @@ private:
     bool scaling = false;
     bool display = false;
 
+    // Progress tracking
+    uint64_t total_duration;
+    uint64_t frame_count;
+
 public:
     // Constructor
     RealSense( int argc, char* argv[] );
@@ -146,6 +150,9 @@ private:
 
     // Save Accel
     inline void saveAccel();
+
+    // Show Progress Bar
+    inline void showProgress( uint64_t current_position );
 };
 
 #endif // __REALSENSE__

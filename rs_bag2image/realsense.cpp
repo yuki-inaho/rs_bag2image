@@ -44,6 +44,11 @@ void RealSense::run()
         // Save Data
         save();
 
+        // Increment frame count and show progress
+        frame_count++;
+        const uint64_t current_position = pipeline_profile.get_device().as<rs2::playback>().get_position();
+        showProgress( current_position );
+
         // Key Check
         const int32_t key = cv::waitKey( 1 );
         if( key == 'q' ){
@@ -51,8 +56,8 @@ void RealSense::run()
         }
 
         // End of Position
-        const uint64_t current_position = pipeline_profile.get_device().as<rs2::playback>().get_position();
         if( static_cast<int64_t>( current_position - last_position ) < 0 ){
+            std::cout << std::endl; // New line after progress bar
             break;
         }
         last_position = current_position;
@@ -155,11 +160,16 @@ inline void RealSense::initializeSensor()
     // Set Non Real Time Playback
     pipeline_profile.get_device().as<rs2::playback>().set_real_time( false );
 
+    // Get Total Duration for Progress Bar
+    total_duration = pipeline_profile.get_device().as<rs2::playback>().get_duration().count();
+    frame_count = 0;
+
     // Show Enable Streams
     const std::vector<rs2::stream_profile> stream_profiles = pipeline_profile.get_streams();
     for( const rs2::stream_profile stream_profile : stream_profiles ){
         std::cout << stream_profile.stream_name() << std::endl;
     }
+    std::cout << std::endl;
 }
 
 // Initialize Save
@@ -771,4 +781,39 @@ inline void RealSense::saveAccel()
     file << accel_data.z << std::endl;
 
     file.close();
+}
+
+// Show Progress Bar
+inline void RealSense::showProgress( uint64_t current_position )
+{
+    if( total_duration == 0 ){
+        return;
+    }
+
+    // Calculate percentage
+    double percentage = ( static_cast<double>( current_position ) / static_cast<double>( total_duration ) ) * 100.0;
+    percentage = std::min( percentage, 100.0 );
+
+    // Create progress bar
+    const int bar_width = 50;
+    int filled_width = static_cast<int>( bar_width * percentage / 100.0 );
+
+    std::cout << "\r"; // Return to beginning of line
+    std::cout << "Progress: [";
+
+    for( int i = 0; i < bar_width; ++i ){
+        if( i < filled_width ){
+            std::cout << "=";
+        }
+        else if( i == filled_width ){
+            std::cout << ">";
+        }
+        else{
+            std::cout << " ";
+        }
+    }
+
+    std::cout << "] " << std::fixed << std::setprecision( 1 ) << percentage << "% ";
+    std::cout << "(" << frame_count << " frames)";
+    std::cout << std::flush;
 }
